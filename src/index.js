@@ -16,11 +16,12 @@ function calculateWinner(squares) {
     ];
     for (let i = 0; i < lines.length; i++) {
         const [a, b, c] = lines[i];
+        const result = { winner: squares[a], mode: lines[i] };
         if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-            return squares[a];
+            return result;
         }
     }
-    return null;
+    return { winner: null, mode: [] };
 }
 
 // 格子函数组件
@@ -29,6 +30,7 @@ function Square(props) {
         <button
             className='square'
             onClick={props.onClick}
+            style={props.winLine.indexOf(props.index) !== -1 ? { background: "#90EE90" } : {}}
         >
             {props.value}
         </button>
@@ -40,6 +42,9 @@ class Board extends React.Component {
     // 渲染格子
     renderSquare(i) {
         return <Square
+            key={i}
+            index={i}
+            winLine={this.props.winLine}
             value={this.props.squares[i]}
             onClick={() => this.props.onClick(i)}
         />;
@@ -89,12 +94,15 @@ class Game extends React.Component {
             // 历史数组，每一项是个对象，对象中的squares是棋盘数组，长度为9
             history: [{
                 squares: Array(9).fill(null),
+                step: null,
                 xy: null,
             }],
             // 当前步数
             stepNumber: 0,
             // 下一步是x嘛
             xIsNext: true,
+            // 升序或降序
+            isAsc: true,
         }
     }
     // 处理点击格子
@@ -103,7 +111,7 @@ class Game extends React.Component {
         const history = this.state.history.slice(0, this.state.stepNumber + 1)
         const current = history[history.length - 1];
         const squares = current.squares.slice()
-        if (calculateWinner(squares) || squares[i]) {
+        if (calculateWinner(squares).winner || squares[i]) {
             return;
         }
         squares[i] = this.state.xIsNext ? 'X' : 'O'
@@ -111,6 +119,7 @@ class Game extends React.Component {
             history: history.concat([{
                 squares: squares,
                 xy: i,
+                step: history.length,
             }]),
             stepNumber: history.length,
             xIsNext: !this.state.xIsNext,
@@ -122,38 +131,58 @@ class Game extends React.Component {
             xIsNext: (step % 2) === 0,
         })
     }
+    ascMoves() {
+        this.setState({
+            isAsc: true
+        })
+    }
+    desMoves() {
+        this.setState({
+            isAsc: false
+        })
+    }
     render() {
-        const history = this.state.history
+        var history = this.state.history
         const current = history[this.state.stepNumber];
-        const winner = calculateWinner(current.squares)
+        const result = calculateWinner(current.squares)
+        const winner = result.winner
 
-        const moves = history.map((step, move) => {
-            const x = step.xy % 3 + 1;
-            const y = Math.floor(step.xy / 3) + 1
-            const desc = move ? 'Gop to move #' + move + '(列号：' + x + ',行号：' + y + ')' : 'Go to game start'
+        var moves = history.map((item, move) => {
+            const x = item.xy % 3 + 1;
+            const y = Math.floor(item.xy / 3) + 1
+            const desc = move ? 'Gop to move #' + item.step + '(列号：' + x + ',行号：' + y + ')' : 'Go to game start'
             return (
                 <li key={move}>
-                    <button onClick={() => this.jumpTo(move)}>{desc}</button>
+                    <button style={this.state.stepNumber === move ? { fontWeight: 800 } : {}} onClick={() => this.jumpTo(move)}>{desc}</button>
                 </li>
             )
         })
+        if (!this.state.isAsc) {
+            moves = moves.reverse()
+        }
         let status;
         if (winner) {
             status = 'winner: ' + winner
         } else {
             status = 'Next player: ' + (this.state.xIsNext ? 'X' : 'O');
         }
+        if (this.state.stepNumber === 9 && winner === null) {
+            status = 'The game ended in a tie.'
+        }
         return (
             <div className="game">
                 <div className="game-board">
                     <Board
                         squares={current.squares}
+                        winLine={result.mode}
                         onClick={(i) => this.handleClick(i)}
                     />
                 </div>
                 <div className="game-info">
                     <div>{status}</div>
-                    <ol>{moves}</ol>
+                    <button onClick={() => { this.ascMoves() }}>升序</button>
+                    <button onClick={() => { this.desMoves() }}>降序</button>
+                    <ul>{moves}</ul>
                 </div>
             </div>
         );
